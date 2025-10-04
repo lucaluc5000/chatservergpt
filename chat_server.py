@@ -13,32 +13,35 @@ chat_history = []  # store messages
 def index():
     return render_template('chat.html')
 
-# When a new user sets username
+# Set or update username
 @socketio.on('set_username')
 def handle_username(username):
+    old_username = users.get(request.sid)
     users[request.sid] = username
-    emit("message", f"🔵 {username} joined the chat", broadcast=True)
-    # Send chat history to the new user
-    for msg in chat_history:
-        emit("message", msg)
+    if old_username:
+        emit("message", f"🔄 {old_username} changed username to {username}", broadcast=True)
+    else:
+        emit("message", f"🔵 {username} joined the chat", broadcast=True)
+        # Send chat history to new user
+        for msg in chat_history:
+            emit("message", msg)
 
-# Handle incoming chat messages
+# Handle incoming messages
 @socketio.on('message')
 def handle_message(msg):
     username = users.get(request.sid, "Anonymous")
     
-    # ADMIN command to clear chat
+    # ADMIN command
     if username == "ADMIN" and msg.strip().lower() == "/clear":
         chat_history.clear()
         emit("message", "⚠️ Chat history cleared by ADMIN", broadcast=True)
         return
     
-    # Normal message
     text = f"{username}: {msg}"
-    chat_history.append(text)  # save message
+    chat_history.append(text)
     emit("message", text, broadcast=True)
 
-# Handle user disconnect
+# Disconnect
 @socketio.on('disconnect')
 def handle_disconnect():
     username = users.pop(request.sid, "Anonymous")

@@ -1,64 +1,85 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Chat App</title>
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 600px; margin: auto; }
-    #chat { border: 1px solid #ccc; height: 400px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; }
-    #msg { width: 80%; padding: 5px; }
-    #send { padding: 5px 10px; }
-    .admin-msg { color: red; font-weight: bold; }
-  </style>
+<meta charset="UTF-8">
+<title>Chat App</title>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; max-width: 600px; margin: 50px auto; }
+  #chat-container { border: 1px solid #ccc; background: #fff; border-radius: 10px; padding: 15px; height: 450px; overflow-y: scroll; display: flex; flex-direction: column; }
+  .message { margin: 5px 0; padding: 8px 12px; border-radius: 10px; max-width: 80%; word-wrap: break-word; }
+  .user-msg { background: #e0f7fa; align-self: flex-start; }
+  .admin-msg { background: #ffcccc; align-self: center; font-weight: bold; }
+  .own-msg { background: #c8e6c9; align-self: flex-end; }
+  #input-container { display: flex; margin-top: 10px; }
+  #msg { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ccc; }
+  #send, #change-username { padding: 10px 15px; margin-left: 5px; border: none; border-radius: 8px; cursor: pointer; background: #1976d2; color: #fff; }
+  #send:hover, #change-username:hover { background: #1565c0; }
+  #admin-hint { color:red; margin-top:5px; display:none; font-size: 0.9em; }
+</style>
 </head>
 <body>
-  <h2>Chat App</h2>
-  <div id="chat"></div>
-  <input id="msg" placeholder="Type a message">
+<h2>Chat App</h2>
+<div id="chat-container"></div>
+
+<div id="input-container">
+  <input id="msg" placeholder="Type a message...">
   <button id="send">Send</button>
-  <p id="admin-hint" style="color:red; display:none;">Tip: Type "/clear" to wipe chat history</p>
+  <button id="change-username">Change Username</button>
+</div>
+<p id="admin-hint">Tip: ADMIN can type "/clear" to wipe chat history</p>
 
-  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
-  <script>
-    const socket = io();
+<script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+<script>
+const socket = io();
 
-    // Get or prompt for username
-    let username = localStorage.getItem('username');
-    if (!username) {
-      username = prompt("Enter your username:");
-      localStorage.setItem('username', username);
-    }
+// Get or prompt for username
+let username = localStorage.getItem('username');
+if(!username){
+  username = prompt("Enter your username:");
+  localStorage.setItem('username', username);
+}
+socket.emit('set_username', username);
 
+// Show admin hint
+if(username === "ADMIN") document.getElementById('admin-hint').style.display = 'block';
+
+// Send message
+document.getElementById('send').onclick = () => {
+  const msg = document.getElementById('msg').value;
+  if(msg.trim() !== ""){
+    socket.emit('message', msg);
+    document.getElementById('msg').value = "";
+  }
+};
+
+// Change username
+document.getElementById('change-username').onclick = () => {
+  const newName = prompt("Enter new username:", username);
+  if(newName && newName.trim() !== ""){
+    username = newName;
+    localStorage.setItem('username', username);
     socket.emit('set_username', username);
+    if(username === "ADMIN") document.getElementById('admin-hint').style.display = 'block';
+    else document.getElementById('admin-hint').style.display = 'none';
+  }
+};
 
-    // Show admin hint if username is ADMIN
-    if(username === "ADMIN"){
-      document.getElementById('admin-hint').style.display = 'block';
-    }
+// Receive messages
+const chatDiv = document.getElementById('chat-container');
+socket.on('message', msg => {
+  const div = document.createElement('div');
+  if(msg.includes("⚠️")) div.className = "message admin-msg";
+  else if(msg.startsWith(username + ":")) div.className = "message own-msg";
+  else div.className = "message user-msg";
+  div.textContent = msg;
+  chatDiv.appendChild(div);
+  chatDiv.scrollTop = chatDiv.scrollHeight;
+});
 
-    // Send chat message
-    document.getElementById('send').onclick = () => {
-      const msg = document.getElementById('msg').value;
-      if(msg.trim() !== "") {
-        socket.emit('message', msg);
-        document.getElementById('msg').value = "";
-      }
-    };
-
-    // Receive messages
-    const chatDiv = document.getElementById('chat');
-    socket.on('message', msg => {
-      const div = document.createElement('div');
-      if(msg.includes("⚠️")) div.classList.add("admin-msg");
-      div.textContent = msg;
-      chatDiv.appendChild(div);
-      chatDiv.scrollTop = chatDiv.scrollHeight;
-    });
-
-    // Send message on Enter key
-    document.getElementById('msg').addEventListener('keypress', e => {
-      if(e.key === 'Enter') document.getElementById('send').click();
-    });
-  </script>
+// Send on Enter key
+document.getElementById('msg').addEventListener('keypress', e => {
+  if(e.key === 'Enter') document.getElementById('send').click();
+});
+</script>
 </body>
 </html>
