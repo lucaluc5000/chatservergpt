@@ -2,46 +2,76 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Chat App</title>
+<title>Advanced Chat App</title>
 <style>
-  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; max-width: 600px; margin: 50px auto; }
-  #chat-container { border: 1px solid #ccc; background: #fff; border-radius: 10px; padding: 15px; height: 450px; overflow-y: scroll; display: flex; flex-direction: column; }
-  .message { margin: 5px 0; padding: 8px 12px; border-radius: 10px; max-width: 80%; word-wrap: break-word; }
-  .user-msg { background: #e0f7fa; align-self: flex-start; }
-  .admin-msg { background: #ffcccc; align-self: center; font-weight: bold; }
-  .own-msg { background: #c8e6c9; align-self: flex-end; }
-  #input-container { display: flex; margin-top: 10px; }
-  #msg { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ccc; }
-  #send, #change-username { padding: 10px 15px; margin-left: 5px; border: none; border-radius: 8px; cursor: pointer; background: #1976d2; color: #fff; }
-  #send:hover, #change-username:hover { background: #1565c0; }
-  #admin-hint { color:red; margin-top:5px; display:none; font-size: 0.9em; }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin:0; background:#f5f5f5; transition: background 0.3s; }
+  .dark { background:#1e1e1e; color:#eee; }
+  #container { display:flex; max-width:900px; margin:30px auto; border-radius:10px; overflow:hidden; height:500px; }
+  #sidebar { width:200px; background:#eceff1; padding:10px; overflow-y:auto; transition: background 0.3s; }
+  .dark #sidebar { background:#2c2c2c; }
+  #chat-wrapper { flex:1; display:flex; flex-direction:column; background:#fff; transition: background 0.3s; }
+  .dark #chat-wrapper { background:#252525; }
+  #chat { flex:1; padding:10px; overflow-y:auto; display:flex; flex-direction:column; }
+  .message { margin:5px 0; padding:8px 12px; border-radius:10px; max-width:70%; word-wrap:break-word; }
+  .own-msg { background:#c8e6c9; align-self:flex-end; }
+  .user-msg { align-self:flex-start; }
+  .system-msg { text-align:center; background:#ffcccc; font-weight:bold; border-radius:5px; padding:5px; margin:5px; }
+  .msg-header { font-size:0.8em; margin-bottom:3px; display:flex; align-items:center; }
+  .avatar { width:20px; height:20px; border-radius:50%; margin-right:5px; }
+  #input-container { display:flex; border-top:1px solid #ccc; padding:5px; }
+  #msg { flex:1; padding:8px; border-radius:5px; border:1px solid #ccc; }
+  #send, #username-btn, #toggle-theme { margin-left:5px; padding:8px 12px; border:none; border-radius:5px; cursor:pointer; background:#1976d2; color:#fff; }
+  #send:hover, #username-btn:hover, #toggle-theme:hover { background:#1565c0; }
+  #typing-indicator { font-size:0.9em; color:#888; margin-left:5px; }
 </style>
 </head>
 <body>
-<h2>Chat App</h2>
-<div id="chat-container"></div>
-
-<div id="input-container">
-  <input id="msg" placeholder="Type a message...">
-  <button id="send">Send</button>
-  <button id="change-username">Change Username</button>
+<div id="container">
+  <div id="sidebar">
+    <h4>Online Users</h4>
+    <ul id="users"></ul>
+  </div>
+  <div id="chat-wrapper">
+    <div id="chat"></div>
+    <div id="typing-indicator"></div>
+    <div id="input-container">
+      <input id="msg" placeholder="Type a message...">
+      <button id="send">Send</button>
+      <button id="username-btn">Change Username</button>
+      <button id="toggle-theme">Dark/Light</button>
+    </div>
+  </div>
 </div>
-<p id="admin-hint">Tip: ADMIN can type "/clear" to wipe chat history</p>
 
 <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
 <script>
 const socket = io();
+let username = localStorage.getItem('username') || prompt("Enter username:");
+let avatar = localStorage.getItem('avatar') || '';
+let color = localStorage.getItem('color') || '#1976d2';
+localStorage.setItem('username', username);
+localStorage.setItem('avatar', avatar);
+localStorage.setItem('color', color);
 
-// Get or prompt for username
-let username = localStorage.getItem('username');
-if(!username){
-  username = prompt("Enter your username:");
-  localStorage.setItem('username', username);
+function sendUsername() {
+  socket.emit('set_username', {username, avatar, color});
 }
-socket.emit('set_username', username);
+sendUsername();
 
-// Show admin hint
-if(username === "ADMIN") document.getElementById('admin-hint').style.display = 'block';
+// Dark/light mode toggle
+document.getElementById('toggle-theme').onclick = () => {
+  document.body.classList.toggle('dark');
+}
+
+// Change username
+document.getElementById('username-btn').onclick = () => {
+  const newName = prompt("Enter new username:", username);
+  if(newName && newName.trim() !== ""){
+    username = newName;
+    localStorage.setItem('username', username);
+    sendUsername();
+  }
+}
 
 // Send message
 document.getElementById('send').onclick = () => {
@@ -50,36 +80,86 @@ document.getElementById('send').onclick = () => {
     socket.emit('message', msg);
     document.getElementById('msg').value = "";
   }
-};
+}
 
-// Change username
-document.getElementById('change-username').onclick = () => {
-  const newName = prompt("Enter new username:", username);
-  if(newName && newName.trim() !== ""){
-    username = newName;
-    localStorage.setItem('username', username);
-    socket.emit('set_username', username);
-    if(username === "ADMIN") document.getElementById('admin-hint').style.display = 'block';
-    else document.getElementById('admin-hint').style.display = 'none';
+// Typing indicator
+let typing = false;
+let typingTimeout;
+const msgInput = document.getElementById('msg');
+msgInput.addEventListener('input', () => {
+  if(!typing){
+    typing = true;
+    socket.emit('typing', true);
   }
-};
+  clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() => {
+    typing = false;
+    socket.emit('typing', false);
+  }, 1000);
+});
 
-// Receive messages
-const chatDiv = document.getElementById('chat-container');
+// Display messages
+const chatDiv = document.getElementById('chat');
 socket.on('message', msg => {
   const div = document.createElement('div');
-  if(msg.includes("⚠️")) div.className = "message admin-msg";
-  else if(msg.startsWith(username + ":")) div.className = "message own-msg";
-  else div.className = "message user-msg";
-  div.textContent = msg;
+  const header = document.createElement('div');
+  header.className = 'msg-header';
+  if(msg.avatar){
+    const img = document.createElement('img');
+    img.src = msg.avatar;
+    img.className = 'avatar';
+    header.appendChild(img);
+  }
+  const nameSpan = document.createElement('span');
+  nameSpan.textContent = `${msg.username} [${msg.timestamp}]`;
+  nameSpan.style.color = msg.color;
+  header.appendChild(nameSpan);
+  div.appendChild(header);
+
+  const textDiv = document.createElement('div');
+  textDiv.textContent = msg.text;
+  div.appendChild(textDiv);
+
+  div.className = msg.username === username ? 'message own-msg' : 'message user-msg';
   chatDiv.appendChild(div);
   chatDiv.scrollTop = chatDiv.scrollHeight;
 });
 
-// Send on Enter key
-document.getElementById('msg').addEventListener('keypress', e => {
-  if(e.key === 'Enter') document.getElementById('send').click();
+// System messages
+socket.on('system_message', text => {
+  const div = document.createElement('div');
+  div.textContent = text;
+  div.className = 'message system-msg';
+  chatDiv.appendChild(div);
+  chatDiv.scrollTop = chatDiv.scrollHeight;
 });
+
+// Update user list
+socket.on('update_users', list => {
+  const ul = document.getElementById('users');
+  ul.innerHTML = '';
+  list.forEach(u => {
+    const li = document.createElement('li');
+    li.textContent = u;
+    ul.appendChild(li);
+  });
+});
+
+// Typing display
+const typingDiv = document.getElementById('typing-indicator');
+socket.on('user_typing', data => {
+  if(data.typing){
+    typingDiv.textContent = `${data.username} is typing...`;
+  } else {
+    typingDiv.textContent = '';
+  }
+});
+
+// Username errors
+socket.on('username_error', msg => alert(msg));
+
+// Refresh page (for /clear)
+socket.on('refresh_page', () => location.reload());
 </script>
 </body>
 </html>
