@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Global Chat</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; padding: 0; }
+        #chat { max-width: 600px; margin: 30px auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h2 { text-align: center; margin-top: 0; }
+        ul { list-style: none; padding: 0; max-height: 400px; overflow-y: auto; margin-bottom: 15px; }
+        li { margin: 5px 0; padding: 8px; background: #f1f1f1; border-radius: 8px; }
+        .system { color: gray; font-style: italic; }
+        #inputBox { display: flex; }
+        #myMessage { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ccc; }
+        button { padding: 10px 15px; margin-left: 10px; border: none; border-radius: 8px; background: #4CAF50; color: white; cursor: pointer; }
+        button:hover { background: #45a049; }
+        #changeUsername { background: #007BFF; margin-top: 10px; }
+        #changeUsername:hover { background: #0069d9; }
+    </style>
+</head>
+<body>
+    <div id="chat">
+        <h2>💬 Global Chat</h2>
+        <ul id="messages"></ul>
+        <div id="inputBox">
+            <input id="myMessage" autocomplete="off" placeholder="Type a message..."/>
+            <button onclick="sendMessage()">Send</button>
+        </div>
+        <button id="changeUsername" onclick="changeUsername()">Change Username</button>
+    </div>
+
+    <script>
+        var socket = io();
+        var input = document.getElementById("myMessage");
+        var messages = document.getElementById("messages");
+
+        function getUsername() {
+            var username = localStorage.getItem("chat_username");
+            if (!username) {
+                username = prompt("Enter a username:");
+                if (username) {
+                    localStorage.setItem("chat_username", username);
+                } else {
+                    username = "Guest";
+                }
+            }
+            return username;
+        }
+
+        var username = getUsername();
+        socket.emit("set_username", username);
+
+        socket.on("message", function(msg) {
+            var li = document.createElement("li");
+            if (msg.startsWith("🔵") || msg.startsWith("🔴")) {
+                li.classList.add("system");
+            }
+            li.textContent = msg;
+            messages.appendChild(li);
+            messages.scrollTop = messages.scrollHeight;
+        });
+
+        function sendMessage() {
+            if (input.value.trim() !== "") {
+                socket.send(input.value);
+                input.value = "";
+            }
+        }
+
+        input.addEventListener("keypress", function(e) {
+            if (e.key === "Enter") {
+                sendMessage();
+            }
+        });
+
+        function changeUsername() {
+            var newUsername = prompt("Enter a new username:");
+            if (newUsername && newUsername.trim() !== "") {
+                localStorage.setItem("chat_username", newUsername.trim());
+                username = newUsername.trim();
+                socket.emit("set_username", username);
+                var li = document.createElement("li");
+                li.textContent = `⚡ Username changed to ${username}`;
+                li.classList.add("system");
+                messages.appendChild(li);
+                messages.scrollTop = messages.scrollHeight;
+            }
+        }
+    </script>
+</body>
+</html>
