@@ -8,7 +8,6 @@
     #chat { border: 1px solid #ccc; height: 400px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; }
     #msg { width: 80%; padding: 5px; }
     #send { padding: 5px 10px; }
-    #admin-panel { margin-top: 10px; }
     .admin-msg { color: red; font-weight: bold; }
   </style>
 </head>
@@ -17,10 +16,7 @@
   <div id="chat"></div>
   <input id="msg" placeholder="Type a message">
   <button id="send">Send</button>
-
-  <div id="admin-panel" style="display:none;">
-    <button id="clear-history">Clear Chat History</button>
-  </div>
+  <p id="admin-hint" style="color:red; display:none;">Tip: Type "/clear" to wipe chat history</p>
 
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
   <script>
@@ -35,9 +31,9 @@
 
     socket.emit('set_username', username);
 
-    // Show admin panel if username is ADMIN
-    if (username === "ADMIN") {
-      document.getElementById('admin-panel').style.display = 'block';
+    // Show admin hint if username is ADMIN
+    if(username === "ADMIN"){
+      document.getElementById('admin-hint').style.display = 'block';
     }
 
     // Send chat message
@@ -47,11 +43,6 @@
         socket.emit('message', msg);
         document.getElementById('msg').value = "";
       }
-    };
-
-    // Clear history button
-    document.getElementById('clear-history').onclick = () => {
-      socket.emit('clear_history');
     };
 
     // Receive messages

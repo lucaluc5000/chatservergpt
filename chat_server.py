@@ -26,17 +26,17 @@ def handle_username(username):
 @socketio.on('message')
 def handle_message(msg):
     username = users.get(request.sid, "Anonymous")
+    
+    # ADMIN command to clear chat
+    if username == "ADMIN" and msg.strip().lower() == "/clear":
+        chat_history.clear()
+        emit("message", "⚠️ Chat history cleared by ADMIN", broadcast=True)
+        return
+    
+    # Normal message
     text = f"{username}: {msg}"
     chat_history.append(text)  # save message
     emit("message", text, broadcast=True)
-
-# ADMIN can clear history
-@socketio.on('clear_history')
-def handle_clear_history():
-    username = users.get(request.sid, "")
-    if username == "ADMIN":
-        chat_history.clear()
-        emit("message", "⚠️ Chat history cleared by ADMIN", broadcast=True)
 
 # Handle user disconnect
 @socketio.on('disconnect')
