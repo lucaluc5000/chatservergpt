@@ -2,33 +2,73 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Advanced Chat App</title>
+<title>Chat App Dark Mode</title>
 <style>
-  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin:0; background:#f5f5f5; transition: background 0.3s; }
-  .dark { background:#1e1e1e; color:#eee; }
-  #container { display:flex; max-width:900px; margin:30px auto; border-radius:10px; overflow:hidden; height:500px; }
-  #sidebar { width:200px; background:#eceff1; padding:10px; overflow-y:auto; transition: background 0.3s; }
-  .dark #sidebar { background:#2c2c2c; }
-  #chat-wrapper { flex:1; display:flex; flex-direction:column; background:#fff; transition: background 0.3s; }
-  .dark #chat-wrapper { background:#252525; }
-  #chat { flex:1; padding:10px; overflow-y:auto; display:flex; flex-direction:column; }
-  .message { margin:5px 0; padding:8px 12px; border-radius:10px; max-width:70%; word-wrap:break-word; }
-  .own-msg { background:#c8e6c9; align-self:flex-end; }
-  .user-msg { align-self:flex-start; }
-  .system-msg { text-align:center; background:#ffcccc; font-weight:bold; border-radius:5px; padding:5px; margin:5px; }
-  .msg-header { font-size:0.8em; margin-bottom:3px; display:flex; align-items:center; }
-  .avatar { width:20px; height:20px; border-radius:50%; margin-right:5px; }
-  #input-container { display:flex; border-top:1px solid #ccc; padding:5px; }
-  #msg { flex:1; padding:8px; border-radius:5px; border:1px solid #ccc; }
-  #send, #username-btn, #toggle-theme { margin-left:5px; padding:8px 12px; border:none; border-radius:5px; cursor:pointer; background:#1976d2; color:#fff; }
-  #send:hover, #username-btn:hover, #toggle-theme:hover { background:#1565c0; }
-  #typing-indicator { font-size:0.9em; color:#888; margin-left:5px; }
+/* Global Styles */
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #121212;
+  color: #e0e0e0;
+}
+
+#container {
+  display: flex;
+  max-width: 1000px;
+  height: 600px;
+  margin: 40px auto;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+}
+
+/* Sidebar */
+#sidebar {
+  width: 220px;
+  background: #1f1f1f;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+}
+#sidebar h3 { margin-top:0; margin-bottom:10px; font-weight: normal; color:#ffcc00; }
+#users { list-style:none; padding:0; margin:0; flex:1; overflow-y:auto; }
+#users li {
+  margin-bottom: 8px;
+  padding:5px 8px;
+  background: #292929;
+  border-radius:6px;
+  font-size:0.95em;
+  display:flex;
+  align-items:center;
+}
+
+/* Chat area */
+#chat-wrapper { flex:1; display:flex; flex-direction: column; background: #181818; }
+#chat { flex:1; padding:15px; overflow-y:auto; display:flex; flex-direction: column; }
+
+/* Chat bubbles */
+.message { max-width:70%; margin-bottom:10px; padding:10px 14px; border-radius:12px; position: relative; word-wrap: break-word; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+.own-msg { background:#2e7d32; align-self:flex-end; color:#fff; }
+.user-msg { background:#424242; align-self:flex-start; color:#fff; }
+.system-msg { background:#ff1744; color:#fff; text-align:center; border-radius:8px; font-weight:bold; }
+
+.msg-header { font-size:0.75em; margin-bottom:4px; display:flex; align-items:center; }
+.avatar { width:24px; height:24px; border-radius:50%; margin-right:6px; object-fit:cover; }
+.timestamp { margin-left:auto; font-size:0.7em; color:#ccc; }
+
+#typing-indicator { font-size:0.85em; color:#aaa; margin-left:15px; height:18px; }
+
+/* Input area */
+#input-container { display:flex; padding:10px; background:#202020; border-top:1px solid #333; }
+#msg { flex:1; padding:10px; border-radius:8px; border:none; background:#2c2c2c; color:#fff; outline:none; }
+button { margin-left:8px; padding:8px 14px; border:none; border-radius:8px; cursor:pointer; background:#ffcc00; color:#121212; font-weight:bold; transition:0.2s; }
+button:hover { background:#ffc107; }
 </style>
 </head>
 <body>
 <div id="container">
   <div id="sidebar">
-    <h4>Online Users</h4>
+    <h3>Online Users</h3>
     <ul id="users"></ul>
   </div>
   <div id="chat-wrapper">
@@ -38,7 +78,7 @@
       <input id="msg" placeholder="Type a message...">
       <button id="send">Send</button>
       <button id="username-btn">Change Username</button>
-      <button id="toggle-theme">Dark/Light</button>
+      <button id="profile-btn">Profile</button>
     </div>
   </div>
 </div>
@@ -46,34 +86,40 @@
 <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
 <script>
 const socket = io();
+
+// --- USER PROFILE ---
 let username = localStorage.getItem('username') || prompt("Enter username:");
 let avatar = localStorage.getItem('avatar') || '';
-let color = localStorage.getItem('color') || '#1976d2';
-localStorage.setItem('username', username);
-localStorage.setItem('avatar', avatar);
-localStorage.setItem('color', color);
+let color = localStorage.getItem('color') || '#ffcc00';
+const isAdmin = username.toUpperCase() === "ADMIN";
 
-function sendUsername() {
+function saveProfile() {
+  localStorage.setItem('username', username);
+  localStorage.setItem('avatar', avatar);
+  localStorage.setItem('color', color);
   socket.emit('set_username', {username, avatar, color});
 }
-sendUsername();
+saveProfile();
 
-// Dark/light mode toggle
-document.getElementById('toggle-theme').onclick = () => {
-  document.body.classList.toggle('dark');
-}
-
-// Change username
+// --- USERNAME CHANGE ---
 document.getElementById('username-btn').onclick = () => {
   const newName = prompt("Enter new username:", username);
   if(newName && newName.trim() !== ""){
     username = newName;
-    localStorage.setItem('username', username);
-    sendUsername();
+    saveProfile();
   }
 }
 
-// Send message
+// --- PROFILE CUSTOMIZATION ---
+document.getElementById('profile-btn').onclick = () => {
+  const newAvatar = prompt("Enter avatar URL:", avatar);
+  const newColor = prompt("Enter username color (hex):", color);
+  if(newAvatar !== null) avatar = newAvatar;
+  if(newColor !== null) color = newColor;
+  saveProfile();
+}
+
+// --- SEND MESSAGE ---
 document.getElementById('send').onclick = () => {
   const msg = document.getElementById('msg').value;
   if(msg.trim() !== ""){
@@ -82,84 +128,73 @@ document.getElementById('send').onclick = () => {
   }
 }
 
-// Typing indicator
+// --- TYPING INDICATOR ---
 let typing = false;
 let typingTimeout;
 const msgInput = document.getElementById('msg');
 msgInput.addEventListener('input', () => {
-  if(!typing){
-    typing = true;
-    socket.emit('typing', true);
-  }
+  if(!typing){ typing = true; socket.emit('typing', true); }
   clearTimeout(typingTimeout);
-  typingTimeout = setTimeout(() => {
-    typing = false;
-    socket.emit('typing', false);
-  }, 1000);
+  typingTimeout = setTimeout(() => { typing=false; socket.emit('typing', false); }, 1000);
 });
 
-// Display messages
+// --- DISPLAY MESSAGES ---
 const chatDiv = document.getElementById('chat');
 socket.on('message', msg => {
   const div = document.createElement('div');
-  const header = document.createElement('div');
-  header.className = 'msg-header';
-  if(msg.avatar){
-    const img = document.createElement('img');
-    img.src = msg.avatar;
-    img.className = 'avatar';
-    header.appendChild(img);
-  }
-  const nameSpan = document.createElement('span');
-  nameSpan.textContent = `${msg.username} [${msg.timestamp}]`;
-  nameSpan.style.color = msg.color;
-  header.appendChild(nameSpan);
+  const header = document.createElement('div'); header.className='msg-header';
+  if(msg.avatar){ const img = document.createElement('img'); img.src=msg.avatar; img.className='avatar'; header.appendChild(img); }
+  const nameSpan = document.createElement('span'); nameSpan.textContent = msg.username; nameSpan.style.color = msg.color; header.appendChild(nameSpan);
+  const ts = document.createElement('span'); ts.textContent=msg.timestamp; ts.className='timestamp'; header.appendChild(ts);
   div.appendChild(header);
-
-  const textDiv = document.createElement('div');
-  textDiv.textContent = msg.text;
-  div.appendChild(textDiv);
-
-  div.className = msg.username === username ? 'message own-msg' : 'message user-msg';
-  chatDiv.appendChild(div);
-  chatDiv.scrollTop = chatDiv.scrollHeight;
+  const textDiv = document.createElement('div'); textDiv.textContent=msg.text; div.appendChild(textDiv);
+  div.className = msg.username===username ? 'message own-msg' : 'message user-msg';
+  chatDiv.appendChild(div); chatDiv.scrollTop = chatDiv.scrollHeight;
 });
 
-// System messages
+// --- SYSTEM MESSAGES ---
 socket.on('system_message', text => {
-  const div = document.createElement('div');
-  div.textContent = text;
-  div.className = 'message system-msg';
-  chatDiv.appendChild(div);
-  chatDiv.scrollTop = chatDiv.scrollHeight;
+  const div = document.createElement('div'); div.textContent=text; div.className='message system-msg';
+  chatDiv.appendChild(div); chatDiv.scrollTop=chatDiv.scrollHeight;
 });
 
-// Update user list
-socket.on('update_users', list => {
-  const ul = document.getElementById('users');
-  ul.innerHTML = '';
-  list.forEach(u => {
+// --- UPDATE USER LIST & ADMIN PANEL ---
+socket.on('update_users', userList => {
+  const ul = document.getElementById('users'); ul.innerHTML='';
+  userList.forEach(u => {
     const li = document.createElement('li');
-    li.textContent = u;
+    if(u.avatar){ const img=document.createElement('img'); img.src=u.avatar; img.className='avatar'; li.appendChild(img);}
+    const nameSpan=document.createElement('span'); nameSpan.textContent=u.username; li.appendChild(nameSpan);
+    if(isAdmin){
+      const infoSpan=document.createElement('span'); infoSpan.style.fontSize='0.75em'; infoSpan.style.color='#aaa'; infoSpan.style.marginLeft='6px';
+      infoSpan.textContent=`(${u.msgCount||0} msgs)`; li.appendChild(infoSpan);
+      li.style.cursor='pointer';
+      li.onclick=()=>{ 
+        const newAvatar=prompt(`Set new avatar for ${u.username}:`, u.avatar||'');
+        const newColor=prompt(`Set new color for ${u.username}:`, u.color||'#ffcc00');
+        socket.emit('admin_update_profile',{target:u.username, avatar:newAvatar, color:newColor});
+      }
+    }
     ul.appendChild(li);
   });
 });
 
-// Typing display
-const typingDiv = document.getElementById('typing-indicator');
-socket.on('user_typing', data => {
-  if(data.typing){
-    typingDiv.textContent = `${data.username} is typing...`;
-  } else {
-    typingDiv.textContent = '';
-  }
+// --- TYPING DISPLAY ---
+const typingDiv=document.getElementById('typing-indicator');
+socket.on('user_typing', data=>{ typingDiv.textContent=data.typing?`${data.username} is typing...` : ''; });
+
+// --- USERNAME ERROR ---
+socket.on('username_error', msg=>alert(msg));
+
+// --- REFRESH PAGE FOR /CLEAR ---
+socket.on('refresh_page', ()=>location.reload());
+
+// --- PROFILE UPDATE FROM ADMIN ---
+socket.on('profile_update', data=>{
+  if(data.avatar!==undefined) avatar=data.avatar;
+  if(data.color!==undefined) color=data.color;
+  saveProfile();
 });
-
-// Username errors
-socket.on('username_error', msg => alert(msg));
-
-// Refresh page (for /clear)
-socket.on('refresh_page', () => location.reload());
 </script>
 </body>
 </html>
