@@ -6,25 +6,39 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-# store usernames by session id
 users = {}
+chat_history = []  # store messages
 
 @app.route('/')
 def index():
     return render_template('chat.html')
 
+# When a new user sets username
 @socketio.on('set_username')
 def handle_username(username):
     users[request.sid] = username
     emit("message", f"🔵 {username} joined the chat", broadcast=True)
+    # Send chat history to the new user
+    for msg in chat_history:
+        emit("message", msg)
 
+# Handle incoming chat messages
 @socketio.on('message')
 def handle_message(msg):
     username = users.get(request.sid, "Anonymous")
     text = f"{username}: {msg}"
-    print(text)
+    chat_history.append(text)  # save message
     emit("message", text, broadcast=True)
 
+# ADMIN can clear history
+@socketio.on('clear_history')
+def handle_clear_history():
+    username = users.get(request.sid, "")
+    if username == "ADMIN":
+        chat_history.clear()
+        emit("message", "⚠️ Chat history cleared by ADMIN", broadcast=True)
+
+# Handle user disconnect
 @socketio.on('disconnect')
 def handle_disconnect():
     username = users.pop(request.sid, "Anonymous")
