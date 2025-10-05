@@ -2,142 +2,105 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Clean Dark Chat</title>
+<title>Simple Dark Chat</title>
 <style>
-body {
-    margin:0;
-    font-family: Arial, sans-serif;
-    background:#111;
-    color:#eee;
-}
-#container { display:flex; max-width:900px; height:600px; margin:40px auto; border-radius:8px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.5);}
-#sidebar { width:200px; background:#1a1a1a; padding:10px; display:flex; flex-direction:column; }
-#sidebar h3 { margin-top:0; color:#ccc; font-weight:normal; }
-#users { list-style:none; padding:0; margin:0; flex:1; overflow-y:auto; }
-#users li { padding:5px; margin-bottom:5px; background:#222; border-radius:5px; display:flex; align-items:center; font-size:0.9em; cursor:default;}
-#users li:hover{ background:#333; }
-
-#chat-wrapper { flex:1; display:flex; flex-direction:column; background:#141414; }
-#chat { flex:1; padding:10px; overflow-y:auto; display:flex; flex-direction:column; }
-.message { max-width:70%; margin-bottom:8px; padding:8px 10px; border-radius:8px; word-wrap:break-word; }
-.own-msg { background:#2e2e2e; align-self:flex-end; }
-.user-msg { background:#222; align-self:flex-start; }
-.system-msg { background:#ff4c4c; color:#fff; text-align:center; border-radius:5px; font-weight:bold; }
-.msg-header { font-size:0.75em; margin-bottom:3px; display:flex; align-items:center; }
-.avatar { width:20px; height:20px; border-radius:50%; margin-right:5px; object-fit:cover; }
-.timestamp { margin-left:auto; font-size:0.7em; color:#aaa; }
-#typing-indicator { font-size:0.8em; color:#aaa; height:18px; margin-left:10px; }
-
-#input-container { display:flex; padding:8px; background:#1c1c1c; border-top:1px solid #333; }
-#msg { flex:1; padding:8px; border-radius:5px; border:none; background:#222; color:#eee; outline:none; }
-button { margin-left:5px; padding:6px 10px; border:none; border-radius:5px; cursor:pointer; background:#555; color:#eee; }
+body { margin:0; font-family:sans-serif; background:#111; color:#eee; }
+#container { display:flex; max-width:800px; height:500px; margin:30px auto; border:1px solid #333; border-radius:6px; overflow:hidden; }
+#sidebar { width:180px; background:#1a1a1a; padding:10px; }
+#users { list-style:none; padding:0; margin:0; }
+#users li { padding:4px; font-size:0.9em; }
+#chat-area { flex:1; display:flex; flex-direction:column; background:#141414; }
+#chat { flex:1; overflow-y:auto; padding:10px; }
+.message { margin-bottom:6px; }
+.own { text-align:right; color:#8fd; }
+.timestamp { font-size:0.75em; color:#aaa; margin-left:5px; }
+#input { display:flex; padding:8px; background:#1c1c1c; }
+#msg { flex:1; padding:6px; border:none; border-radius:4px; background:#222; color:#eee; }
+button { margin-left:5px; padding:6px 10px; border:none; border-radius:4px; background:#444; color:#eee; cursor:pointer; }
 button:hover { background:#666; }
 </style>
 </head>
 <body>
 <div id="container">
-    <div id="sidebar">
-        <h3>Online Users</h3>
-        <ul id="users"></ul>
+  <div id="sidebar">
+    <h3>Online</h3>
+    <ul id="users"></ul>
+  </div>
+  <div id="chat-area">
+    <div id="chat"></div>
+    <div id="input">
+      <input id="msg" placeholder="Type a message...">
+      <button id="send">Send</button>
     </div>
-    <div id="chat-wrapper">
-        <div id="chat"></div>
-        <div id="typing-indicator"></div>
-        <div id="input-container">
-            <input id="msg" placeholder="Type a message...">
-            <button id="send">Send</button>
-            <button id="profile-btn">Profile</button>
-        </div>
-    </div>
+  </div>
 </div>
 
 <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
 <script>
 const socket = io();
-let username = localStorage.getItem('username') || prompt("Enter username:");
-let avatar = localStorage.getItem('avatar') || '';
-const isAdmin = username.toUpperCase() === "ADMIN";
-function saveProfile(){ localStorage.setItem('username', username); localStorage.setItem('avatar', avatar); socket.emit('set_username',{username,avatar}); }
-saveProfile();
+let username = localStorage.getItem("username") || prompt("Enter username:");
+localStorage.setItem("username", username);
+socket.emit("set_username", username);
 
-// PROFILE BUTTON
-document.getElementById('profile-btn').onclick = ()=>{
-    const newAvatar = prompt("Enter avatar URL:", avatar);
-    if(newAvatar!==null) avatar=newAvatar;
-    saveProfile();
-}
+// Send message
+document.getElementById("send").onclick = () => {
+    const msg = document.getElementById("msg").value;
+    if(msg.trim() !== "") {
+        socket.emit("message", msg);
+        document.getElementById("msg").value = "";
+    }
+};
 
-// SEND MESSAGE
-document.getElementById('send').onclick = ()=>{
-    const msg = document.getElementById('msg').value;
-    if(msg.trim()!==""){ socket.emit('message', msg); document.getElementById('msg').value=''; }
-}
-
-// TYPING INDICATOR
-let typing=false, typingTimeout;
-const msgInput=document.getElementById('msg');
-msgInput.addEventListener('input', ()=>{
-    if(!typing){ typing=true; socket.emit('typing', true); }
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(()=>{ typing=false; socket.emit('typing', false); },1000);
+// Display messages
+const chat = document.getElementById("chat");
+socket.on("message", data => {
+    const div = document.createElement("div");
+    div.className = "message" + (data.username === username ? " own" : "");
+    div.textContent = data.username + ": " + data.text;
+    const ts = document.createElement("span");
+    ts.className = "timestamp";
+    ts.textContent = " " + data.timestamp;
+    div.appendChild(ts);
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
 });
 
-// DISPLAY MESSAGES
-const chatDiv = document.getElementById('chat');
-socket.on('message', msg=>{
-    const div=document.createElement('div'); 
-    const header=document.createElement('div'); header.className='msg-header';
-    if(msg.avatar){ const img=document.createElement('img'); img.src=msg.avatar; img.className='avatar'; header.appendChild(img);}
-    const nameSpan=document.createElement('span'); nameSpan.textContent=msg.username; header.appendChild(nameSpan);
-    const ts=document.createElement('span'); ts.textContent=msg.timestamp; ts.className='timestamp'; header.appendChild(ts);
-    div.appendChild(header);
-    const textDiv=document.createElement('div'); textDiv.textContent=msg.text; div.appendChild(textDiv);
-    div.className=msg.username===username?'message own-msg':'message user-msg';
-    chatDiv.appendChild(div); chatDiv.scrollTop=chatDiv.scrollHeight;
+// Load chat history
+socket.on("chat_history", history => {
+    history.forEach(msg => {
+        const div = document.createElement("div");
+        div.className = "message" + (msg.username === username ? " own" : "");
+        div.textContent = msg.username + ": " + msg.text;
+        const ts = document.createElement("span");
+        ts.className = "timestamp";
+        ts.textContent = " " + msg.timestamp;
+        div.appendChild(ts);
+        chat.appendChild(div);
+    });
+    chat.scrollTop = chat.scrollHeight;
 });
 
-// SYSTEM MESSAGES
-socket.on('system_message', text=>{
-    const div=document.createElement('div'); div.textContent=text; div.className='message system-msg';
-    chatDiv.appendChild(div); chatDiv.scrollTop=chatDiv.scrollHeight;
-});
-
-// CHAT HISTORY
-socket.on('chat_history', history=>{
-    history.forEach(msg=>socket.emit('message', msg.text));
-});
-
-// UPDATE USER LIST
-socket.on('update_users', userList=>{
-    const ul=document.getElementById('users'); ul.innerHTML='';
-    userList.forEach(u=>{
-        const li=document.createElement('li');
-        if(u.avatar){ const img=document.createElement('img'); img.src=u.avatar; img.className='avatar'; li.appendChild(img);}
-        const nameSpan=document.createElement('span'); nameSpan.textContent=u.username; li.appendChild(nameSpan);
-        // ADMIN click to edit user avatar
-        if(isAdmin){
-            li.style.cursor='pointer';
-            li.onclick=()=>{
-                const newAvatar=prompt(`Set avatar for ${u.username}:`, u.avatar||'');
-                socket.emit('admin_update_profile',{target:u.username, avatar:newAvatar});
-            }
-        }
+// Update user list
+socket.on("update_users", users => {
+    const ul = document.getElementById("users");
+    ul.innerHTML = "";
+    users.forEach(u => {
+        const li = document.createElement("li");
+        li.textContent = u;
         ul.appendChild(li);
     });
 });
 
-// TYPING DISPLAY
-const typingDiv=document.getElementById('typing-indicator');
-socket.on('user_typing', data=>{ typingDiv.textContent=data.typing?`${data.username} is typing...` : ''; });
+// Username taken
+socket.on("username_error", msg => {
+    alert(msg);
+    username = prompt("Enter another username:");
+    localStorage.setItem("username", username);
+    socket.emit("set_username", username);
+});
 
-// USERNAME ERROR
-socket.on('username_error', msg=>alert(msg));
-
-// REFRESH PAGE FOR /CLEAR
-socket.on('refresh_page', ()=>location.reload());
-
-// PROFILE UPDATE FROM ADMIN
-socket.on('profile_update', data=>{ if(data.avatar!==undefined) avatar=data.avatar; saveProfile(); });
+// Refresh on /clear
+socket.on("refresh_page", () => location.reload());
 </script>
 </body>
 </html>
